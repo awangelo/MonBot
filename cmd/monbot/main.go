@@ -11,8 +11,19 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/mdp/qrterminal"
 	"go.mau.fi/whatsmeow"
+	waProto "go.mau.fi/whatsmeow/binary/proto"
 	"go.mau.fi/whatsmeow/store/sqlstore"
+	"go.mau.fi/whatsmeow/types"
+	"go.mau.fi/whatsmeow/types/events"
+	"google.golang.org/protobuf/proto"
 )
+
+func eventHandler(evt interface{}) {
+	switch v := evt.(type) {
+	case *events.Message:
+		fmt.Println("Received a message!", v.Message.GetConversation())
+	}
+}
 
 func main() {
 	// Container envolve um storage sqlite
@@ -27,6 +38,7 @@ func main() {
 		log.Fatalf("Error getting first device: %v", err)
 	}
 	client := whatsmeow.NewClient(device, nil)
+	client.AddEventHandler(eventHandler)
 
 	// Solicitar um codigo QR caso nao tenha
 	if client.Store.ID == nil {
@@ -45,6 +57,21 @@ func main() {
 				fmt.Println("Login event:", evt.Event)
 			}
 		}
+	} else {
+		// Se a sessão já estiver logada, conecte-se diretamente
+		err = client.Connect()
+		if err != nil {
+			log.Fatalf("Error connecting client: %v", err)
+		}
+		log.Println("connected")
+	}
+
+	listGroups(client)
+
+	groupJID := "556182100810-1580939047@g.us"
+	err = sendMessageToGroup(client, groupJID, "Olá, grupo!")
+	if err != nil {
+		log.Printf("Erro ao enviar mensagem: %v", err)
 	}
 
 	// Listen to Ctrl+C (you can also do something else that prevents the program from exiting)
@@ -53,4 +80,51 @@ func main() {
 	<-c
 
 	client.Disconnect()
+}
+
+func sendMessageToGroup(client *whatsmeow.Client, groupJID string, message string) error {
+	jid, err := types.ParseJID(groupJID)
+	if err != nil {
+		return fmt.Errorf("JID inválido: %v", err)
+	}
+
+	msg := &waProto.Message{
+		Conversation: proto.String(message),
+	}
+
+	_, err = client.SendMessage(context.Background(), jid, msg)
+	if err != nil {
+		return fmt.Errorf("Erro ao enviar mensagem: %v", err)
+	}
+
+	fmt.Println("Mensagem enviada com sucesso!")
+	return nil
+}
+
+func listGroups(client *whatsmeow.Client) {
+	fmt.Println("Lista de Grupos:")
+	groups, err := client.GetJoinedGroups()
+	if err != nil {
+		log.Fatalf("Erro ao buscar grupos: %v", err)
+	}
+
+	for _, group := range groups {
+		fmt.Printf("Grupo: %s - JID: %s\n", group.Name, group.JID)
+	}
+}
+
+func listContacts(client *whatsmeow.Client) {
+	// Obter todos os contatos conhecidos pelo dispositivo
+	contacts, err := client.Store.Contacts.GetAllContacts()
+	if err != nil {
+		log.Fatalf("Error fetching contacts: %v", err)
+	}
+
+	fmt.Println("Lista de Contatos e Grupos:")
+	for jid, contact := range contacts {
+		fmt.Printf("Contato: %s - JID: %s\n", contact.PushName, jid)
+
+	}
+	fmt.Println("done")
+
 }
