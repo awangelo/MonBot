@@ -6,9 +6,11 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/mdp/qrterminal"
 	"go.mau.fi/whatsmeow"
@@ -19,10 +21,59 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+var client *whatsmeow.Client
+var groupJID types.JID
+
+func init() {
+	if err := godotenv.Load(); err != nil {
+		log.Fatalf("Error loading .env: %v", err)
+	}
+
+	// Jid do grupo deve ser guardado em .env
+	groupJIDString := os.Getenv("GROUP_JID")
+	if groupJIDString == "" {
+		log.Fatal("GROUP_JID is not defined in .env")
+	}
+
+	// Parse do JID
+	var parseErr error
+	groupJID, parseErr = types.ParseJID(groupJIDString)
+	if parseErr != nil {
+		log.Fatalf("Error parsing GROUP_JID: %v", parseErr)
+	}
+}
+
 func eventHandler(evt interface{}) {
 	switch v := evt.(type) {
 	case *events.Message:
-		fmt.Println("Received a message!", v.Message.GetConversation())
+		handleGroupMessage(v)
+	}
+}
+
+func handleGroupMessage(msg *events.Message) {
+	// Ignorar se não for mensagem de um grupo
+	if msg.Info.Chat.Server != "g.us" {
+		return
+	}
+
+	sender := msg.Info.Sender.String()
+	var text string
+
+	// Verificar diferentes tipos de mensagens
+	if msg.Message.Conversation != nil {
+		text = msg.Message.GetConversation()
+	} else if msg.Message.ExtendedTextMessage != nil {
+		text = msg.Message.ExtendedTextMessage.GetText()
+	} else {
+		// Outros tipos de mensagens (mídia, etc.)
+		text = "Mensagem não textual"
+	}
+
+	fmt.Printf("Mensagem recebida no grupo de %s: %s\n", sender, text)
+
+	if isBotMentioned(msg) {
+		fmt.Println("O bot foi mencionado!")
+		replyToMention(msg)
 	}
 }
 
@@ -38,7 +89,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error getting first device: %v", err)
 	}
-	client := whatsmeow.NewClient(device, nil)
+	client = whatsmeow.NewClient(device, nil)
 	client.AddEventHandler(eventHandler)
 
 	// Solicitar um codigo QR caso nao tenha
@@ -67,15 +118,15 @@ func main() {
 		log.Println("connected")
 	}
 
-	listGroups(client)
+	listGroups()
+	// listContacts()
 
-	groupJID := "556182100810-1580939047@g.us"
-	for i := range 100 {
-		err := sendMessageToGroup(client, groupJID, fmt.Sprintf("Mensagem %d", i))
+	for i := range 2 {
+		err := sendMessageToGroup(groupJID.String(), fmt.Sprintf("Mensagem %d", i))
 		if err != nil {
 			log.Fatalf("Erro ao enviar mensagem: %v", err)
 		}
-		time.Sleep(time.Second * 2)
+		time.Sleep(time.Second * 1)
 	}
 
 	// Listen to Ctrl+C (you can also do something else that prevents the program from exiting)
@@ -86,7 +137,47 @@ func main() {
 	client.Disconnect()
 }
 
-func sendMessageToGroup(client *whatsmeow.Client, groupJID string, message string) error {
+func isBotMentioned(msg *events.Message) bool {
+	if msg.Message.ExtendedTextMessage != nil && msg.Message.ExtendedTextMessage.ContextInfo != nil {
+		mentionedJIDs := msg.Message.ExtendedTextMessage.ContextInfo.MentionedJID
+		for _, jid := range mentionedJIDs {
+			if jid == client.Store.ID.String() {
+				return true
+			}
+		}
+	}
+	// Verificar também no texto da mensagem (para casos de menção sem formatação)
+	text := msg.Message.GetConversation()
+	if text == "" && msg.Message.ExtendedTextMessage != nil {
+		text = msg.Message.ExtendedTextMessage.GetText()
+	}
+	return strings.Contains(text, "@"+client.Store.ID.User)
+}
+
+func replyToMention(msg *events.Message) {
+	response := fmt.Sprintf("Olá @%s, você me mencionou!", msg.Info.PushName)
+
+	replyMsg := &waProto.Message{
+		ExtendedTextMessage: &waProto.ExtendedTextMessage{
+			Text: proto.String(response),
+			ContextInfo: &waProto.ContextInfo{
+				StanzaID:      &msg.Info.ID,
+				Participant:   proto.String(msg.Info.Sender.String()),
+				QuotedMessage: msg.Message,
+				MentionedJID:  []string{msg.Info.Sender.String()},
+			},
+		},
+	}
+
+	_, err := client.SendMessage(context.Background(), msg.Info.Chat, replyMsg)
+	if err != nil {
+		log.Printf("Erro ao responder à menção: %v", err)
+	} else {
+		fmt.Println("Resposta enviada com sucesso!")
+	}
+}
+
+func sendMessageToGroup(groupJID string, message string) error {
 	jid, err := types.ParseJID(groupJID)
 	if err != nil {
 		return fmt.Errorf("JID inválido: %v", err)
@@ -105,7 +196,7 @@ func sendMessageToGroup(client *whatsmeow.Client, groupJID string, message strin
 	return nil
 }
 
-func listGroups(client *whatsmeow.Client) {
+func listGroups() {
 	fmt.Println("Lista de Grupos:")
 	groups, err := client.GetJoinedGroups()
 	if err != nil {
@@ -115,4 +206,17 @@ func listGroups(client *whatsmeow.Client) {
 	for _, group := range groups {
 		fmt.Printf("Grupo: %s - JID: %s\n", group.Name, group.JID)
 	}
+}
+
+func listContacts() {
+	// Obter todos os contatos conhecidos pelo dispositivo
+	contacts, err := client.Store.Contacts.GetAllContacts()
+	if err != nil {
+		log.Fatalf("Error fetching contacts: %v", err)
+	}
+	fmt.Println("Lista de Contatos e Grupos:")
+	for jid, contact := range contacts {
+		fmt.Printf("Contato: %s - JID: %s\n", contact.PushName, jid)
+	}
+	fmt.Println("done")
 }
