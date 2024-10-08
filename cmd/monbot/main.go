@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/mdp/qrterminal"
@@ -69,9 +70,12 @@ func main() {
 	listGroups(client)
 
 	groupJID := "556182100810-1580939047@g.us"
-	err = sendMessageToGroup(client, groupJID, "Olá, grupo!")
-	if err != nil {
-		log.Printf("Erro ao enviar mensagem: %v", err)
+	for i := range 100 {
+		err := sendMessageToGroup(client, groupJID, fmt.Sprintf("Mensagem %d", i))
+		if err != nil {
+			log.Fatalf("Erro ao enviar mensagem: %v", err)
+		}
+		time.Sleep(time.Second * 2)
 	}
 
 	// Listen to Ctrl+C (you can also do something else that prevents the program from exiting)
@@ -111,20 +115,4 @@ func listGroups(client *whatsmeow.Client) {
 	for _, group := range groups {
 		fmt.Printf("Grupo: %s - JID: %s\n", group.Name, group.JID)
 	}
-}
-
-func listContacts(client *whatsmeow.Client) {
-	// Obter todos os contatos conhecidos pelo dispositivo
-	contacts, err := client.Store.Contacts.GetAllContacts()
-	if err != nil {
-		log.Fatalf("Error fetching contacts: %v", err)
-	}
-
-	fmt.Println("Lista de Contatos e Grupos:")
-	for jid, contact := range contacts {
-		fmt.Printf("Contato: %s - JID: %s\n", contact.PushName, jid)
-
-	}
-	fmt.Println("done")
-
 }
