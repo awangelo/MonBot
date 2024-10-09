@@ -18,12 +18,37 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func ReplyToMention(client *whatsmeow.Client, msg *events.Message) {
-	response := fmt.Sprintf("Olá @%s, você me mencionou!", msg.Info.PushName)
+// Declaração da variável global
+var groupJID types.JID
 
+func HandleCommand(client *whatsmeow.Client, msg *events.Message) {
+	// Comando recebido
+	command := msg.Message.GetConversation()
+	log.Println("Comando recebido:", command)
+
+	switch command {
+	case "!":
+		// Ignorar comando vazio
+		return
+	case "!help", "!h":
+		// Responder com a lista de comandos disponíveis
+		sendMessageToGroup(client,
+			`Comandos disponíveis:
+		!help: Mostra esta mensagem
+		!ping: Responde com 'pong'`)
+	case "!ping", "!p":
+		// Responder com 'pong'
+		sendMessageToGroup(client, "pong 🏓")
+	default:
+		// Comando desconhecido
+		sendMessageToGroup(client, "Comando desconhecido")
+	}
+}
+
+func ReplyToMention(client *whatsmeow.Client, msg *events.Message) {
 	replyMsg := &waE2E.Message{
 		ExtendedTextMessage: &waE2E.ExtendedTextMessage{
-			Text: proto.String(response),
+			Text: proto.String("Veja os comandos disponíveis digitando !help"),
 			ContextInfo: &waE2E.ContextInfo{
 				StanzaID:      &msg.Info.ID,
 				Participant:   proto.String(msg.Info.Sender.String()),
@@ -41,9 +66,9 @@ func ReplyToMention(client *whatsmeow.Client, msg *events.Message) {
 	}
 }
 
-func SendScheduledMessage(client *whatsmeow.Client, groupJID types.JID, delayMins int) {
+func SendScheduledMessage(client *whatsmeow.Client, delayMins int) {
 	for {
-		err := sendMessageToGroup(client, groupJID.String(), fmt.Sprintf("Mensagem"))
+		err := sendMessageToGroup(client, fmt.Sprintf("Mensagem"))
 		if err != nil {
 			log.Fatalf("Erro ao enviar mensagem: %v", err)
 		}
@@ -51,41 +76,35 @@ func SendScheduledMessage(client *whatsmeow.Client, groupJID types.JID, delayMin
 	}
 }
 
-func sendMessageToGroup(client *whatsmeow.Client, groupJID string, message string) error {
-	jid, err := types.ParseJID(groupJID)
-	if err != nil {
-		return fmt.Errorf("JID inválido: %v", err)
-	}
-
+func sendMessageToGroup(client *whatsmeow.Client, message string) error {
 	msg := &waE2E.Message{
 		Conversation: proto.String(message),
 	}
 
-	_, err = client.SendMessage(context.Background(), jid, msg)
+	_, err := client.SendMessage(context.Background(), groupJID, msg)
 	if err != nil {
 		return fmt.Errorf("Erro ao enviar mensagem: %v", err)
 	}
 
-	fmt.Println("Mensagem enviada com sucesso!")
+	log.Println("Mensagem enviada com sucesso!")
 	return nil
 }
 
-func InitBot() (*whatsmeow.Client, types.JID, int, error) {
+func InitBot() (*whatsmeow.Client, int, error) {
 	var client *whatsmeow.Client
-	var groupJID types.JID
 	var delayMins int
 	// Container envolve um storage sqlite
 	container, err := sqlstore.New("sqlite3", "file:whatsmeow.db?_foreign_keys=true", nil)
 	if err != nil {
-		return client, groupJID, delayMins, fmt.Errorf("Error creating container: %w", err)
+		return client, delayMins, fmt.Errorf("Error creating container: %w", err)
 	}
 	// Client que ira interagir com a WhatsApp web API
 	client = createClient(container)
 	groupJID, delayMins, err = loadFromEnv()
 	if err != nil {
-		return client, groupJID, delayMins, fmt.Errorf("Error creating new bot: %w", err)
+		return client, delayMins, fmt.Errorf("Error creating new bot: %w", err)
 	}
-	return client, groupJID, delayMins, nil
+	return client, delayMins, nil
 }
 
 func createClient(container *sqlstore.Container) *whatsmeow.Client {
