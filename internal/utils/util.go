@@ -87,3 +87,20 @@ func PreventExit() {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
 }
+
+func InitLogger(msg *events.Message) {
+	sender := msg.Info.Sender.String()
+
+	// Verificar diferentes tipos de mensagens
+	var text string
+	if msg.Message.Conversation != nil {
+		text = msg.Message.GetConversation()
+	} else if msg.Message.ExtendedTextMessage != nil {
+		text = msg.Message.ExtendedTextMessage.GetText()
+	} else {
+		// Outros tipos de mensagens (mídia, etc.)
+		text = "media message"
+	}
+
+	log.Printf("Mensagem recebida no grupo de %s: %s\n", sender, text)
+}
