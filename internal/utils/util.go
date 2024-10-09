@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/mdp/qrterminal"
 	"go.mau.fi/whatsmeow"
@@ -77,4 +79,11 @@ func IsBotMentioned(client *whatsmeow.Client, msg *events.Message) bool {
 		text = msg.Message.ExtendedTextMessage.GetText()
 	}
 	return strings.Contains(text, "@"+client.Store.ID.User)
+}
+
+func PreventExit() {
+	// Listen to Ctrl+C (you can also do something else that prevents the program from exiting)
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	<-c
 }
