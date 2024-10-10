@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/awangelo/MonBot/internal/utils"
 	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
 	"go.mau.fi/whatsmeow"
@@ -35,10 +36,15 @@ func HandleCommand(client *whatsmeow.Client, msg *events.Message) {
 		sendMessageToGroup(client,
 			`Comandos disponíveis:
 		!help: Mostra esta mensagem
-		!ping: Responde com 'pong'`)
+		!ping: Responde com 'pong'
+		!ram: Mostra o uso de memória`)
 	case "!ping", "!p":
 		// Responder com 'pong'
 		sendMessageToGroup(client, "pong 🏓")
+	case "!ram", "!mem":
+		// Responder com a quantidade de memória usada
+		m := utils.GetMemoryUsage()
+		sendMessageToGroup(client, fmt.Sprintf("Memória em uso: %d KB", m))
 	default:
 		// Comando desconhecido
 		sendMessageToGroup(client, "Comando desconhecido")
@@ -68,7 +74,7 @@ func ReplyToMention(client *whatsmeow.Client, msg *events.Message) {
 
 func SendScheduledMessage(client *whatsmeow.Client, delayMins int) {
 	for {
-		err := sendMessageToGroup(client, fmt.Sprintf("Mensagem"))
+		err := sendMessageToGroup(client, fmt.Sprintf("Veja os comandos disponíveis digitando !help"))
 		if err != nil {
 			log.Fatalf("Erro ao enviar mensagem: %v", err)
 		}

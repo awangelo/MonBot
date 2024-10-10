@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"runtime"
 	"strings"
 	"syscall"
 
@@ -103,4 +104,11 @@ func InitLogger(msg *events.Message) {
 	}
 
 	log.Printf("Mensagem recebida no grupo de %s: %s\n", sender, text)
+}
+
+func GetMemoryUsage() uint64 {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	// Converter para KB
+	return m.Alloc / 1024
 }
