@@ -33,11 +33,8 @@ func HandleCommand(client *whatsmeow.Client, msg *events.Message) {
 		return
 	case "!help", "!h":
 		// Responder com a lista de comandos disponíveis
-		sendMessageToGroup(client,
-			`Comandos disponíveis:
-		!help: Mostra esta mensagem
-		!ping: Responde com 'pong'
-		!ram: Mostra o uso de memória`)
+		helpMessage := "\t\t\t\t*Comandos disponíveis:*\n\n* *!help* - Mostra esta mensagem\n* *!ping* - Responde com 'pong'\n* *!ram* - Mostra o uso de memória"
+		sendMessageToGroup(client, helpMessage)
 	case "!ping", "!p":
 		// Responder com 'pong'
 		sendMessageToGroup(client, "pong 🏓")
