@@ -56,7 +56,7 @@ func SendScheduledMessage(client *whatsmeow.Client, groupJID types.JID, delayMin
 			log.Fatalf("Erro ao enviar a mensagem programada: %v", err)
 		}
 
-		time.Sleep(time.Minute * time.Duration(delayMins))
+		time.Sleep(time.Hour * time.Duration(delayMins))
 	}
 }
 
