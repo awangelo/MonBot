@@ -15,7 +15,13 @@ import (
 )
 
 const (
-	infoMessage = "Veja os comandos disponíveis digitando !help"
+	infoMessage = "👾 Minicurso de C# e Unity Engine 👾\n\n" +
+		"Aprenda a programar com C# e a criar jogos incríveis usando a Unity Engine!\n\n" +
+		"Local: Campus Asa Norte, laboratório *1109*\n" +
+		"Período: de *28/10/2024* a *12/11/2024*\n" +
+		"Horário: das *11h* às *12h30*,  aulas todas *segundas, terças, quintas e sextas*\n" +
+		"* não terá aulas nas quartas para não dar choque de horário com a Oficina de Ciência de Dados\n\n" +
+		"Comece a criar seus jogos agora: https://forms.gle/6xhCnc2DpYJDJTFr6"
 )
 
 // ReplyToMention responde à menção do bot com a mensagem de ajuda
